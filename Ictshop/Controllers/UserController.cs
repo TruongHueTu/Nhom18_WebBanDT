@@ -91,7 +91,7 @@ namespace Ictshop.Controllers
 
         }
 
-        public ActionResult Profile(int? id)
+        public ActionResult Profile( int? id)
         {
             if (id == null)
             {
@@ -137,6 +137,91 @@ namespace Ictshop.Controllers
             ViewBag.IDQuyen = new SelectList(db.PhanQuyens, "IDQuyen", "TenQuyen", nguoidung.IDQuyen);
             return View(nguoidung);
         }
+        // Thêm Quên mật khẩu
+        // Action hiển thị form quên mật khẩu
+        [HttpGet]
+        public ActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        // Action xử lý logic quên mật khẩu
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult ForgotPassword(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+            {
+                ViewBag.Error = "Vui lòng nhập email!";
+                return View();
+            }
+
+            // Tìm kiếm người dùng qua email
+            var user = db.Nguoidungs.FirstOrDefault(u => u.Email == email);
+            if (user == null)
+            {
+                ViewBag.Error = "Email này không tồn tại trong hệ thống!";
+                return View();
+            }
+
+            // Tạo mã xác thực hoặc token để khôi phục mật khẩu
+            var resetToken = Guid.NewGuid().ToString();
+            user.ResetPasswordToken = resetToken;
+            user.ResetPasswordTokenExpiration = DateTime.Now.AddHours(1); // Token hết hạn sau 1 giờ
+            db.SaveChanges();
+
+            // Gửi email với liên kết để đặt lại mật khẩu (có chứa token)
+            string resetLink = Url.Action("ResetPassword", "User", new { token = resetToken }, Request.Url.Scheme);
+            string emailBody = $"Vui lòng nhấn vào liên kết này để đặt lại mật khẩu: <a href='{resetLink}'>Đặt lại mật khẩu</a>";
+            // Bạn cần tích hợp dịch vụ gửi email ở đây (SendEmailToUser(user.Email, emailBody))
+
+            ViewBag.Message = "Một liên kết khôi phục mật khẩu đã được gửi đến email của bạn.";
+            return View();
+        }
+
+        // Action hiển thị form để đặt lại mật khẩu
+        [HttpGet]
+        public ActionResult ResetPassword(string token)
+        {
+            // Tìm người dùng qua token
+            var user = db.Nguoidungs.FirstOrDefault(u => u.ResetPasswordToken == token && u.ResetPasswordTokenExpiration > DateTime.Now);
+            if (user == null)
+            {
+                ViewBag.Error = "Token không hợp lệ hoặc đã hết hạn.";
+                return RedirectToAction("ForgotPassword");
+            }
+
+            return View(new ResetPasswordModel { Token = token });
+        }
+
+        // Action xử lý việc đặt lại mật khẩu
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult ResetPassword(ResetPasswordModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            // Tìm người dùng qua token
+            var user = db.Nguoidungs.FirstOrDefault(u => u.ResetPasswordToken == model.Token && u.ResetPasswordTokenExpiration > DateTime.Now);
+            if (user == null)
+            {
+                ViewBag.Error = "Token không hợp lệ hoặc đã hết hạn.";
+                return RedirectToAction("ForgotPassword");
+            }
+
+            // Đặt lại mật khẩu mới
+            user.Matkhau = model.NewPassword; // Hash lại mật khẩu trước khi lưu
+            user.ResetPasswordToken = null;
+            user.ResetPasswordTokenExpiration = null;
+            db.SaveChanges();
+
+            ViewBag.Message = "Mật khẩu của bạn đã được cập nhật thành công.";
+            return RedirectToAction("Dangnhap");
+        }
+        //
         public static byte[] encryptData(string data)
         {
             System.Security.Cryptography.MD5CryptoServiceProvider md5Hasher = new System.Security.Cryptography.MD5CryptoServiceProvider();

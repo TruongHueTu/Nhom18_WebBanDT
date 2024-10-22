@@ -51,5 +51,8 @@
         public virtual ICollection<Donhang> Donhang { get; set; }
 
         public virtual PhanQuyen PhanQuyen { get; set; }
+
+        public string ResetPasswordToken { get; set; }
+        public DateTime? ResetPasswordTokenExpiration { get; set; }
     }
 }
